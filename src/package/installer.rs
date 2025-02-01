@@ -34,30 +34,20 @@ impl<'a> RecipeInstaller<'a> {
         let yaml = std::fs::read_to_string(&path).context("failed to read file")?;
         let docs = Yaml::load_from_str(&yaml).context("failed to parse yaml")?;
 
-        let args_def = docs[0]["recipe"]["args"]
-            .as_vec()
-            .map(|args| {
-                args.iter()
-                    .filter_map(|x| x.as_str())
-                    .filter_map(|x| x.split_once('='))
-                    .collect::<HashMap<_, _>>()
-            })
-            .unwrap_or_default();
-
         if let Some(patterns) = docs[0]["install_files"].as_str() {
-            self.install_files(patterns)
+            self.install_files(&docs[0], patterns)
                 .context("failed to install files")?;
         }
 
         if let Some(patches) = docs[0]["patch_files"].as_hash() {
-            self.install_patches(patches, &args_def)
+            self.install_patches(&docs[0], patches)
                 .context("failed to install patches")?;
         }
 
         Ok(())
     }
 
-    fn install_files(&self, patterns: &str) -> Result {
+    fn install_files(&self, doc: &Yaml, patterns: &str) -> Result {
         install_dir(
             self.source.dir(),
             &self.dest,
@@ -66,19 +56,19 @@ impl<'a> RecipeInstaller<'a> {
         )
     }
 
-    fn install_patches(&self, patches: &Hash, args_def: &HashMap<&str, &str>) -> Result {
-        for (filename, doc) in patches {
+    fn install_patches(&self, doc: &Yaml, patches: &Hash) -> Result {
+        for (filename, patch) in patches {
             let filename = filename.as_str().context("filename must be a string")?;
-            doc.as_vec().context("patch must be an array")?;
+            patch.as_vec().context("patch must be an array")?;
 
             println!("Patching: {filename}");
-            self.install_patch(filename, doc, args_def)?;
+            self.install_patch(doc, filename, patch)?;
         }
 
         Ok(())
     }
 
-    fn install_patch(&self, filename: &str, doc: &Yaml, args_def: &HashMap<&str, &str>) -> Result {
+    fn install_patch(&self, doc: &Yaml, filename: &str, patch: &Yaml) -> Result {
         let path = self.dest.join(filename);
 
         let yaml = if path.exists() {
@@ -87,8 +77,8 @@ impl<'a> RecipeInstaller<'a> {
             String::new()
         };
 
-        // Modifying the YAML as strings because /plum/ uses comments
-        // to keep track of the patches it installs
+        // Processing the YAML as plain text rather than calling a YAML library
+        // because /plum/ uses comments to keep track of the patches it installs
         let mut yaml = yaml.lines().map(|x| x.to_string()).collect::<Vec<_>>();
 
         if !yaml.iter().any(|x| x == "__patch:") {
@@ -110,14 +100,16 @@ impl<'a> RecipeInstaller<'a> {
 
         let mut out = String::new();
         let mut emitter = YamlEmitter::new(&mut out);
-        emitter.dump(doc)?;
+        emitter.dump(patch)?;
+
+        let default_args = self.get_default_args(doc);
 
         yaml.push(header);
         yaml.extend(out.lines().skip(1).map(|line| {
             shellexpand::env_with_context_no_errors(&format!("  {line}"), |key| {
                 match self.recipe.args.get(key) {
                     Some(value) => Some(&**value),
-                    None => args_def.get(key).map(|v| &**v),
+                    None => default_args.get(key).map(|v| &**v),
                 }
             })
             .to_string()
@@ -127,6 +119,18 @@ impl<'a> RecipeInstaller<'a> {
         std::fs::write(path, yaml.join("\n") + "\n")?;
 
         Ok(())
+    }
+
+    fn get_default_args<'b>(&self, doc: &'b Yaml) -> HashMap<&'b str, &'b str> {
+        doc["recipe"]["args"]
+            .as_vec()
+            .map(|args| {
+                args.iter()
+                    .filter_map(|x| x.as_str())
+                    .filter_map(|x| x.split_once('='))
+                    .collect::<HashMap<_, _>>()
+            })
+            .unwrap_or_default()
     }
 }
 
