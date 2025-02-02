@@ -6,10 +6,11 @@ description = "RIME configuration installer"
 
 [dependencies]
 anyhow = "1.0.95"
-bpaf = { version = "0.9.16", features = ["derive"] }
+bpaf = { version = "0.9.16", features = ["derive", "dull-color"] }
 dirs = "6.0.0"
 git2 = "0.20.0"
 globset = "0.4.15"
+owo-colors = "4.1.0"
 pathdiff = "0.2.3"
 regex-lite = "0.1.6"
 saphyr = "0.0.3"

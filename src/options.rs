@@ -4,7 +4,7 @@ use std::str::FromStr;
 use anyhow::bail;
 use bpaf::{Args, Bpaf, ParseFailure};
 
-#[derive(Clone, Debug, Bpaf)]
+#[derive(Debug, Bpaf)]
 #[bpaf(options, version, fallback_to_usage)]
 pub struct Options {
     /// Select package interactively
@@ -12,7 +12,7 @@ pub struct Options {
     pub select: bool,
 
     /// Specify the RIME frontend
-    #[bpaf(short, long, fallback(Default::default()))]
+    #[bpaf(short, long, fallback(Frontend::Unknown))]
     pub frontend: Frontend,
 
     /// Specify the directory of RIME configurations
@@ -50,29 +50,29 @@ impl Options {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Frontend {
     Fcitx,
     Fcitx5,
     Ibus,
     Squirrel,
     Weasel,
+    Unknown,
 }
 
-impl Default for Frontend {
-    #[cfg(target_os = "linux")]
-    fn default() -> Self {
-        Self::Ibus
-    }
+impl Frontend {
+    pub fn or_guess(&self) -> Self {
+        let Self::Unknown = self else {
+            return *self;
+        };
 
-    #[cfg(target_os = "macos")]
-    fn default() -> Self {
-        Self::Squirrel
-    }
-
-    #[cfg(target_os = "windows")]
-    fn default() -> Self {
-        Self::Weasel
+        #[allow(unreachable_patterns)]
+        match true {
+            cfg!(target_os = "linux") => Self::Ibus,
+            cfg!(target_os = "macos") => Self::Squirrel,
+            cfg!(target_os = "windows") => Self::Weasel,
+            _ => Self::Unknown,
+        }
     }
 }
 

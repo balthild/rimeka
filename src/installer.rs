@@ -3,72 +3,92 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context};
 use globset::{Glob, GlobSet, GlobSetBuilder};
+use owo_colors::OwoColorize;
 use pathdiff::diff_paths;
 use saphyr::{Hash, Yaml, YamlEmitter};
 use walkdir::WalkDir;
 
+use crate::package::Package;
+use crate::spec::Recipe;
 use crate::Result;
 
-use super::source::PackageSource;
-use super::Recipe;
-
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct RecipeInstaller<'a> {
-    source: &'a PackageSource<'a>,
+    package: &'a Package<'a>,
     dest: PathBuf,
     recipe: Recipe,
+    options: HashMap<String, String>,
 }
 
 impl<'a> RecipeInstaller<'a> {
-    pub fn new(source: &'a PackageSource, dest: PathBuf, recipe: Recipe) -> Self {
+    pub fn new(package: &'a Package, dest: PathBuf, recipe: Recipe) -> Self {
         Self {
-            source,
+            package,
             dest,
             recipe,
+            options: HashMap::new(),
         }
     }
 
-    pub fn install(&self) -> Result {
-        let path = self.source.dir().join(self.recipe.filename());
-
+    pub fn install(mut self) -> Result {
+        let path = self.package.dir().join(self.recipe.filename());
         let yaml = std::fs::read_to_string(&path).context("failed to read file")?;
         let docs = Yaml::load_from_str(&yaml).context("failed to parse yaml")?;
 
-        if let Some(patterns) = docs[0]["install_files"].as_str() {
-            self.install_files(&docs[0], patterns)
+        let doc = &docs[0];
+
+        self.resolve_options(&doc["recipe"]);
+
+        if let Some(patterns) = doc["install_files"].as_str() {
+            self.install_files(patterns)
                 .context("failed to install files")?;
         }
 
-        if let Some(patches) = docs[0]["patch_files"].as_hash() {
-            self.install_patches(&docs[0], patches)
+        if let Some(patches) = doc["patch_files"].as_hash() {
+            self.install_patches(patches)
                 .context("failed to install patches")?;
         }
 
         Ok(())
     }
 
-    fn install_files(&self, doc: &Yaml, patterns: &str) -> Result {
+    fn resolve_options(&mut self, meta: &Yaml) {
+        // Default options defined in the YAML
+        if let Some(args) = meta["args"].as_vec() {
+            self.options.extend(
+                args.iter()
+                    .filter_map(|x| x.as_str())
+                    .filter_map(|x| x.split_once('='))
+                    .map(|(k, v)| (k.to_string(), v.to_string())),
+            );
+        }
+
+        // Overriden options specified in the CLI args
+        self.options.extend(self.package.spec().args().clone());
+    }
+
+    fn install_files(&self, patterns: &str) -> Result {
         install_dir(
-            self.source.dir(),
+            self.package.dir(),
             &self.dest,
             &shlex::split(patterns).context("syntax error in the file list")?,
             &[],
         )
     }
 
-    fn install_patches(&self, doc: &Yaml, patches: &Hash) -> Result {
+    fn install_patches(&self, patches: &Hash) -> Result {
         for (filename, patch) in patches {
             let filename = filename.as_str().context("filename must be a string")?;
             patch.as_vec().context("patch must be an array")?;
 
-            println!("Patching: {filename}");
-            self.install_patch(doc, filename, patch)?;
+            println!("- {} {}", "Patching:".cyan(), filename);
+            self.install_patch(filename, patch)?;
         }
 
         Ok(())
     }
 
-    fn install_patch(&self, doc: &Yaml, filename: &str, patch: &Yaml) -> Result {
+    fn install_patch(&self, filename: &str, patch: &Yaml) -> Result {
         let path = self.dest.join(filename);
 
         let yaml = if path.exists() {
@@ -85,13 +105,13 @@ impl<'a> RecipeInstaller<'a> {
             yaml.push("__patch:".to_string());
         }
 
-        let rxid = self.recipe.rxid(self.source.package());
+        let rxid = self.package.spec().name();
         let header = format!("# Rx: {rxid}: {{");
         let footer = "# }".to_string();
 
         if let Some(line_top) = yaml.iter().position(|x| x == &header) {
             let Some(line_delta) = yaml.iter().skip(line_top).position(|x| x == &footer) else {
-                bail!("failed to parse previous patch file");
+                bail!("failed to parse the previously patched file");
             };
 
             let line_bottom = line_top + line_delta;
@@ -102,17 +122,11 @@ impl<'a> RecipeInstaller<'a> {
         let mut emitter = YamlEmitter::new(&mut out);
         emitter.dump(patch)?;
 
-        let default_args = self.get_default_args(doc);
-
         yaml.push(header);
         yaml.extend(out.lines().skip(1).map(|line| {
-            shellexpand::env_with_context_no_errors(&format!("  {line}"), |key| {
-                match self.recipe.args.get(key) {
-                    Some(value) => Some(&**value),
-                    None => default_args.get(key).map(|v| &**v),
-                }
-            })
-            .to_string()
+            let line = format!("  {line}");
+            let line = shellexpand::env_with_context_no_errors(&line, |key| self.options.get(key));
+            line.to_string()
         }));
         yaml.push(footer);
 
@@ -120,39 +134,31 @@ impl<'a> RecipeInstaller<'a> {
 
         Ok(())
     }
-
-    fn get_default_args<'b>(&self, doc: &'b Yaml) -> HashMap<&'b str, &'b str> {
-        doc["recipe"]["args"]
-            .as_vec()
-            .map(|args| {
-                args.iter()
-                    .filter_map(|x| x.as_str())
-                    .filter_map(|x| x.split_once('='))
-                    .collect::<HashMap<_, _>>()
-            })
-            .unwrap_or_default()
-    }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DefaultInstaller<'a> {
-    source: &'a PackageSource<'a>,
+    package: &'a Package<'a>,
     dest: PathBuf,
 }
 
 impl<'a> DefaultInstaller<'a> {
-    pub fn new(source: &'a PackageSource, dest: PathBuf) -> Self {
-        Self { source, dest }
+    pub fn new(package: &'a Package, dest: PathBuf) -> Self {
+        Self { package, dest }
     }
 
-    pub fn install(&self) -> Result {
+    pub fn install(self) -> Result {
         install_dir(
-            self.source.dir(),
+            self.package.dir(),
             &self.dest,
             &["*.yaml", "*.txt", "*.gram", "opencc/*.*"],
             &[
-                "**/recipe.yaml",
-                "**/*.{recipe.yaml,custom.yaml,json,ocd,txt}",
+                "recipe.yaml",
+                "**/*.recipe.yaml",
+                "**/*.custom.yaml",
+                "**/*.json",
+                "**/*.ocd",
+                "**/*.txt",
             ],
         )
     }
@@ -173,7 +179,7 @@ where
             continue;
         }
 
-        println!("Copying: {}", relative.display());
+        println!("- {} {}", "Copying:".cyan(), relative.display());
 
         let to = dest.join(&relative);
         std::fs::create_dir_all(to.parent().unwrap())?;

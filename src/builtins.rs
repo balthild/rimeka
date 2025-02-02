@@ -1,10 +1,9 @@
 use std::str::FromStr;
 
 use crate::Result;
+use crate::Spec;
 
-use super::Package;
-
-pub fn preset() -> Result<Vec<Package>> {
+pub fn preset() -> Result<Vec<Spec>> {
     [
         "bopomofo",
         "cangjie",
@@ -15,11 +14,11 @@ pub fn preset() -> Result<Vec<Package>> {
         "terra-pinyin",
     ]
     .into_iter()
-    .map(Package::from_str)
+    .map(Spec::from_str)
     .collect()
 }
 
-pub fn extra() -> Result<Vec<Package>> {
+pub fn extra() -> Result<Vec<Spec>> {
     [
         "array",
         "cantonese",
@@ -38,11 +37,11 @@ pub fn extra() -> Result<Vec<Package>> {
         "wugniu",
     ]
     .into_iter()
-    .map(Package::from_str)
+    .map(Spec::from_str)
     .collect()
 }
 
-pub fn all() -> Result<Vec<Package>> {
+pub fn all() -> Result<Vec<Spec>> {
     let preset = preset()?;
     let extra = extra()?;
     Ok(preset.into_iter().chain(extra).collect())
