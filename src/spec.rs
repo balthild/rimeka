@@ -30,8 +30,8 @@ impl Spec {
         &self.repo
     }
 
-    pub fn branch(&self) -> Option<&String> {
-        self.branch.as_ref()
+    pub fn branch(&self) -> Option<&str> {
+        self.branch.as_deref()
     }
 
     pub fn recipe(&self) -> Option<&Recipe> {

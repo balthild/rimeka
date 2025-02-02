@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use owo_colors::OwoColorize;
+use path_clean::PathClean;
 use pathdiff::diff_paths;
 use saphyr::{Hash, Yaml, YamlEmitter};
 use walkdir::WalkDir;
@@ -31,7 +32,7 @@ impl<'a> RecipeInstaller<'a> {
     }
 
     pub fn install(mut self) -> Result {
-        let path = self.package.dir().join(self.recipe.filename());
+        let path = self.package.dir().join(self.recipe.filename()).clean();
         let yaml = std::fs::read_to_string(&path).context("failed to read file")?;
         let docs = Yaml::load_from_str(&yaml).context("failed to parse yaml")?;
 
@@ -89,7 +90,7 @@ impl<'a> RecipeInstaller<'a> {
     }
 
     fn install_patch(&self, filename: &str, patch: &Yaml) -> Result {
-        let path = self.dest.join(filename);
+        let path = self.dest.join(filename).clean();
 
         let yaml = if path.exists() {
             std::fs::read_to_string(&path)?
@@ -105,8 +106,8 @@ impl<'a> RecipeInstaller<'a> {
             yaml.push("__patch:".to_string());
         }
 
-        let rxid = self.package.spec().name();
-        let header = format!("# Rx: {rxid}: {{");
+        let name = self.package.spec().name();
+        let header = format!("# Rx: {name}: {{");
         let footer = "# }".to_string();
 
         if let Some(line_top) = yaml.iter().position(|x| x == &header) {
@@ -173,7 +174,7 @@ where
 
     for entry in WalkDir::new(src) {
         let entry = entry?;
-        let relative = diff_paths(entry.path(), src).expect("path shouldn't be relative");
+        let relative = diff_paths(entry.path(), src).expect("walked path shouldn't be relative");
 
         if !include.is_match(&relative) || exclude.is_match(&relative) {
             continue;

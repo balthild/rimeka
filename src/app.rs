@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Context};
 use owo_colors::OwoColorize;
+use path_clean::PathClean;
 
 use crate::options::{Frontend, Options};
 use crate::spec::Spec;
@@ -29,8 +30,19 @@ impl App {
     }
 
     fn mkdir(&self) -> Result {
-        std::fs::create_dir_all(self.data_dir()?)?;
-        std::fs::create_dir_all(self.rime_dir()?)?;
+        let rime = self.rime_dir()?;
+        let data = self.data_dir()?;
+        let packages = self.packages_dir()?;
+
+        println!("RIME User Directory: {}", rime.display());
+        println!("Rimeka Directory: {}", data.display());
+        println!("Packages Directory: {}", packages.display());
+        println!();
+
+        std::fs::create_dir_all(rime)?;
+        std::fs::create_dir_all(data)?;
+        std::fs::create_dir_all(packages)?;
+
         Ok(())
     }
 
@@ -53,7 +65,7 @@ impl App {
         let base = self.packages_dir()?;
 
         for spec in &specs {
-            println!("{} {}", "Fetching:".green(), spec.repo());
+            println!("{} {}", "Fetching:".green(), spec.repo(),);
             spec.locate_package(&base).fetch()?;
         }
 
@@ -85,22 +97,22 @@ impl App {
 
     fn rime_dir(&self) -> Result<PathBuf> {
         if let Some(x) = &self.options.dir {
-            return Ok(x.clone());
+            return Ok(x.clean());
         }
 
         let home = dirs::home_dir().context("user profile dir unavailable")?;
+
         let dir = match self.options.frontend.or_guess() {
-            Frontend::Fcitx => home.join(".config/fcitx/rime"),
-            Frontend::Fcitx5 => home.join(".local/share/fcitx5/rime"),
-            Frontend::Ibus => home.join(".config/ibus/rime"),
-            Frontend::Squirrel => home.join("Library/Rime"),
-            Frontend::Weasel => home.join("AppData/Roaming/Rime"),
+            Frontend::Fcitx => ".config/fcitx/rime",
+            Frontend::Fcitx5 => ".local/share/fcitx5/rime",
+            Frontend::Ibus => ".config/ibus/rime",
+            Frontend::Squirrel => "Library/Rime",
+            Frontend::Weasel => "AppData/Roaming/Rime",
             Frontend::Unknown => {
-                bail!("Cannot determine frontend. Please specify --frontend or --dir")
+                bail!("--frontend or --dir is required on this operating system")
             }
         };
 
-        // TODO: remove this join
-        Ok(dir.join("rimeka"))
+        Ok(home.join(dir).clean())
     }
 }

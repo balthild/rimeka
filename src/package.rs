@@ -4,6 +4,7 @@ use anyhow::Context;
 use git2::build::RepoBuilder;
 use git2::{Direction, FetchOptions, Repository, ResetType};
 use owo_colors::OwoColorize;
+use path_clean::PathClean;
 
 use crate::installer::{DefaultInstaller, RecipeInstaller};
 use crate::spec::{Recipe, Spec};
@@ -17,7 +18,7 @@ pub struct Package<'a> {
 
 impl<'a> Package<'a> {
     pub fn new(spec: &'a Spec, base: &Path) -> Self {
-        let dir = base.join(spec.repo());
+        let dir = base.join(spec.repo()).clean();
         Self { spec, dir }
     }
 
@@ -68,7 +69,7 @@ impl GitHubRepo {
         GitHubRepo {
             url: format!("https://github.com/{}", spec.repo()),
             dir: dir.to_path_buf(),
-            branch: spec.branch().cloned(),
+            branch: spec.branch().map(|x| x.to_string()),
         }
     }
 
