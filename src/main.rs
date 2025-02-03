@@ -9,6 +9,7 @@ use crate::spec::Spec;
 
 mod app;
 mod builtins;
+mod fetcher;
 mod installer;
 mod options;
 mod package;
