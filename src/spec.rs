@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::convert::Infallible;
+use std::fmt::Display;
 use std::path::Path;
 use std::str::FromStr;
 
@@ -52,6 +53,12 @@ impl Spec {
 
     pub fn locate_package(&self, base: &Path) -> Package {
         Package::new(self, base)
+    }
+}
+
+impl Display for Spec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name())
     }
 }
 
@@ -136,11 +143,11 @@ impl FromStr for Spec {
                     before,
                     errored.red().bold(),
                     after,
-                    // arrow
+                    // pointer
                     " ".repeat(before.len()),
                     "^".repeat(errored.len()).red().bold(),
                     // message
-                    e[0]
+                    e[0],
                 )
             })?;
 

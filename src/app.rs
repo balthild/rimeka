@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
 use anyhow::{bail, Context};
+use dialoguer::theme::SimpleTheme;
+use dialoguer::MultiSelect;
 use owo_colors::OwoColorize;
 use path_clean::PathClean;
 
@@ -24,6 +26,9 @@ impl App {
 
         if self.options.select {
             specs = self.select(specs);
+            if specs.is_empty() {
+                bail!("no package is selected")
+            }
         }
 
         self.install(specs)
@@ -58,7 +63,18 @@ impl App {
     }
 
     fn select(&self, candidates: Vec<Spec>) -> Vec<Spec> {
+        let choices = MultiSelect::with_theme(&SimpleTheme)
+            .with_prompt("Pick the packages to be installed, or press Ctrl+C to cancel")
+            .items(&candidates)
+            .interact()
+            .unwrap_or_else(|_| std::process::exit(1));
+
         candidates
+            .into_iter()
+            .enumerate()
+            .filter(|(i, _)| choices.contains(i))
+            .map(|(_, spec)| spec)
+            .collect()
     }
 
     fn install(&self, specs: Vec<Spec>) -> Result {
