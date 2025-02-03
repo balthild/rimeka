@@ -33,7 +33,8 @@ impl GitFetcher {
             .arg(&self.dir)
             .arg("--depth=1")
             .spawn()?
-            .wait()?;
+            .wait()?
+            .exit_ok()?;
 
         Ok(())
     }
@@ -55,7 +56,8 @@ impl GitFetcher {
             .current_dir(&self.dir)
             .args(args)
             .spawn()?
-            .wait()?;
+            .wait()?
+            .exit_ok()?;
 
         Ok(())
     }

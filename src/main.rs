@@ -1,5 +1,6 @@
 #![feature(try_blocks)]
 #![feature(iterator_try_collect)]
+#![feature(exit_status_error)]
 
 use owo_colors::OwoColorize;
 
@@ -24,6 +25,6 @@ fn main() {
 
     if let Err(e) = app.run() {
         eprintln!("{} {:?}", "Error:".red().bold(), e);
-        std::process::exit(99);
+        std::process::exit(128);
     }
 }

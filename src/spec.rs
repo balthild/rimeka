@@ -84,7 +84,7 @@ impl FromStr for Spec {
         pub fn repo<'s>() -> impl Parser<'s, &'s str, String, Extra<'s>> {
             let community = username().then_ignore(just('/')).then(reponame());
             let builtins = reponame().map(|x| format!("rime/rime-{x}"));
-            community.map(|(a, b)| format!("{a}/{b}")).or(builtins)
+            community.to_slice().map(|x| x.to_string()).or(builtins)
         }
 
         pub fn branch<'s>() -> impl Parser<'s, &'s str, Option<&'s str>, Extra<'s>> {
