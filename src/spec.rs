@@ -66,20 +66,19 @@ impl FromStr for Spec {
             any().filter(|c: &char| c.is_alphanumeric())
         }
 
-        fn username<'s>() -> impl Parser<'s, &'s str, String, Extra<'s>> {
-            alnum().or(just('-')).repeated().at_least(1).collect()
+        fn username<'s>() -> impl Parser<'s, &'s str, &'s str, Extra<'s>> {
+            alnum().or(just('-')).repeated().at_least(1).to_slice()
         }
 
-        fn reponame<'s>() -> impl Parser<'s, &'s str, String, Extra<'s>> {
-            alnum().or(one_of("._-")).repeated().at_least(1).collect()
+        fn reponame<'s>() -> impl Parser<'s, &'s str, &'s str, Extra<'s>> {
+            alnum().or(one_of("._-")).repeated().at_least(1).to_slice()
         }
 
-        fn pathname<'s>(dotfile: bool) -> impl Parser<'s, &'s str, String, Extra<'s>> {
+        fn pathname<'s>(dotfile: bool) -> impl Parser<'s, &'s str, &'s str, Extra<'s>> {
             let token = alnum().or(one_of("._-"));
-            let item = token.repeated().at_least(1).collect();
-            let item = item.filter(move |x: &String| dotfile || !x.starts_with('.'));
-            let seq = item.separated_by(just('/')).at_least(1).collect::<Vec<_>>();
-            seq.map(|x| x.join("."))
+            let item = token.repeated().at_least(1).to_slice();
+            let item = item.filter(move |x| dotfile || !x.starts_with('.'));
+            item.separated_by(just('/')).at_least(1).to_slice()
         }
 
         pub fn repo<'s>() -> impl Parser<'s, &'s str, String, Extra<'s>> {
@@ -88,11 +87,11 @@ impl FromStr for Spec {
             community.map(|(a, b)| format!("{a}/{b}")).or(builtins)
         }
 
-        pub fn branch<'s>() -> impl Parser<'s, &'s str, Option<String>, Extra<'s>> {
+        pub fn branch<'s>() -> impl Parser<'s, &'s str, Option<&'s str>, Extra<'s>> {
             just('@').ignore_then(pathname(false)).or_not()
         }
 
-        pub fn recipe<'s>() -> impl Parser<'s, &'s str, Option<String>, Extra<'s>> {
+        pub fn recipe<'s>() -> impl Parser<'s, &'s str, Option<&'s str>, Extra<'s>> {
             just(':').ignore_then(pathname(true)).or_not()
         }
 
@@ -110,8 +109,8 @@ impl FromStr for Spec {
             &'s str,
             (
                 String,
-                Option<String>,
-                Option<String>,
+                Option<&'s str>,
+                Option<&'s str>,
                 HashMap<String, String>,
             ),
             Extra<'s>,
@@ -130,7 +129,7 @@ impl FromStr for Spec {
             })?;
 
         Ok(Self {
-            repo: repo.to_string(),
+            repo,
             branch: branch.map(|x| x.to_string()),
             recipe: recipe.map(|x| x.parse().unwrap()),
             options,
