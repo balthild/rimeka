@@ -3,7 +3,7 @@ use std::convert::Infallible;
 use std::path::Path;
 use std::str::FromStr;
 
-use anyhow::bail;
+use anyhow::{anyhow, bail};
 
 use crate::package::Package;
 use crate::Result;
@@ -58,7 +58,6 @@ impl FromStr for Spec {
     type Err = anyhow::Error;
 
     fn from_str(target: &str) -> Result<Self, Self::Err> {
-        use anyhow::anyhow;
         use chumsky::prelude::*;
 
         type Extra<'s> = extra::Err<Rich<'s, char>>;
@@ -84,8 +83,9 @@ impl FromStr for Spec {
         }
 
         pub fn repo<'s>() -> impl Parser<'s, &'s str, String, Extra<'s>> {
-            let fullname = username().then_ignore(just('/')).then(reponame());
-            fullname.map(|(a, b)| format!("{a}/{b}")).or(reponame())
+            let community = username().then_ignore(just('/')).then(reponame());
+            let builtins = reponame().map(|x| format!("rime/rime-{x}"));
+            community.map(|(a, b)| format!("{a}/{b}")).or(builtins)
         }
 
         pub fn branch<'s>() -> impl Parser<'s, &'s str, Option<String>, Extra<'s>> {
