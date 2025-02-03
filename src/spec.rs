@@ -4,6 +4,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 use anyhow::{anyhow, bail};
+use owo_colors::OwoColorize;
 
 use crate::package::Package;
 use crate::Result;
@@ -124,8 +125,23 @@ impl FromStr for Spec {
 
         let (repo, branch, recipe, options) =
             parser().parse(target.trim()).into_result().map_err(|e| {
-                let first = e[0].to_string();
-                anyhow!("invalid package or recipe: {target}\n{first}")
+                let span = e[0].span();
+                let before = &target[..span.start];
+                let errored = &target[span.start..span.end];
+                let after = &target[span.end..];
+
+                anyhow!(
+                    "invalid package or recipe\n{}{}{}\n{}{}\n{}",
+                    // expr
+                    before,
+                    errored.red().bold(),
+                    after,
+                    // arrow
+                    " ".repeat(before.len()),
+                    "^".repeat(errored.len()).red().bold(),
+                    // message
+                    e[0]
+                )
             })?;
 
         Ok(Self {
