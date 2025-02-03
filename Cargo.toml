@@ -7,9 +7,10 @@ description = "RIME configuration installer"
 [dependencies]
 anyhow = "1.0.95"
 bpaf = { version = "0.9.16", features = ["derive", "dull-color"] }
+chumsky = "1.0.0-alpha.8"
 dirs = "6.0.0"
 git2 = { version = "0.20.0", optional = true }
-globset = "0.4.15"
+glob = "0.3.2"
 owo-colors = "4.1.0"
 path-clean = "1.0.1"
 pathdiff = "0.2.3"

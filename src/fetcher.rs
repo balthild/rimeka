@@ -22,8 +22,18 @@ impl GitFetcher {
 #[cfg(feature = "git-cli")]
 impl GitFetcher {
     pub fn clone(&self) -> Result {
+        use std::process::Command;
+
         std::fs::create_dir_all(&self.dir)?;
-        self.call("git", &["clone", &self.url, ".", "--depth=1"])?;
+
+        Command::new("git")
+            .current_dir(&self.dir)
+            .arg("clone")
+            .arg(&self.url)
+            .arg(&self.dir)
+            .arg("--depth=1")
+            .spawn()?
+            .wait()?;
 
         Ok(())
     }

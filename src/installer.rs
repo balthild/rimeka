@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context};
-use globset::{Glob, GlobSet, GlobSetBuilder};
 use owo_colors::OwoColorize;
 use path_clean::PathClean;
 use pathdiff::diff_paths;
 use saphyr::{Hash, Yaml, YamlEmitter};
 use walkdir::WalkDir;
 
+use crate::glob::PatternSet;
 use crate::package::Package;
 use crate::spec::Recipe;
 use crate::Result;
@@ -169,14 +169,14 @@ fn install_dir<P>(src: &Path, dest: &Path, include: &[P], exclude: &[P]) -> Resu
 where
     P: AsRef<str>,
 {
-    let include = build_glob_set(include)?;
-    let exclude = build_glob_set(exclude)?;
+    let include = PatternSet::new(include)?;
+    let exclude = PatternSet::new(exclude)?;
 
     for entry in WalkDir::new(src) {
         let entry = entry?;
         let relative = diff_paths(entry.path(), src).expect("walked path shouldn't be relative");
 
-        if !include.is_match(&relative) || exclude.is_match(&relative) {
+        if !include.matches(&relative) || exclude.matches(&relative) {
             continue;
         }
 
@@ -188,19 +188,4 @@ where
     }
 
     Ok(())
-}
-
-fn build_glob_set<P>(patterns: &[P]) -> Result<GlobSet>
-where
-    P: AsRef<str>,
-{
-    let mut builder = GlobSetBuilder::new();
-
-    for pattern in patterns {
-        let pattern = pattern.as_ref();
-        let glob = Glob::new(pattern);
-        builder.add(glob.with_context(|| format!("invalid glob pattern: {pattern}"))?);
-    }
-
-    builder.build().context("failed to build glob set")
 }

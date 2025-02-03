@@ -10,10 +10,10 @@ use crate::spec::Spec;
 mod app;
 mod builtins;
 mod fetcher;
+mod glob;
 mod installer;
 mod options;
 mod package;
-mod regex;
 mod spec;
 
 pub type Result<T = (), E = anyhow::Error> = std::result::Result<T, E>;

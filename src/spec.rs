@@ -6,7 +6,7 @@ use std::str::FromStr;
 use anyhow::bail;
 
 use crate::package::Package;
-use crate::{lazy_regex, re_capture, re_optional, re_seplist, Result};
+use crate::Result;
 
 #[derive(Debug, Clone)]
 pub struct Spec {
@@ -58,66 +58,82 @@ impl FromStr for Spec {
     type Err = anyhow::Error;
 
     fn from_str(target: &str) -> Result<Self, Self::Err> {
+        use anyhow::anyhow;
+        use chumsky::prelude::*;
+
+        type Extra<'s> = extra::Err<Rich<'s, char>>;
+
+        fn alnum<'s>() -> impl Parser<'s, &'s str, char, Extra<'s>> {
+            any().filter(|c: &char| c.is_alphanumeric())
+        }
+
+        fn username<'s>() -> impl Parser<'s, &'s str, String, Extra<'s>> {
+            alnum().or(just('-')).repeated().at_least(1).collect()
+        }
+
+        fn reponame<'s>() -> impl Parser<'s, &'s str, String, Extra<'s>> {
+            alnum().or(one_of("._-")).repeated().at_least(1).collect()
+        }
+
+        fn pathname<'s>(dotfile: bool) -> impl Parser<'s, &'s str, String, Extra<'s>> {
+            let token = alnum().or(one_of("._-"));
+            let item = token.repeated().at_least(1).collect();
+            let item = item.filter(move |x: &String| dotfile || !x.starts_with('.'));
+            let seq = item.separated_by(just('/')).at_least(1).collect::<Vec<_>>();
+            seq.map(|x| x.join("."))
+        }
+
+        pub fn repo<'s>() -> impl Parser<'s, &'s str, String, Extra<'s>> {
+            let fullname = username().then_ignore(just('/')).then(reponame());
+            fullname.map(|(a, b)| format!("{a}/{b}")).or(reponame())
+        }
+
+        pub fn branch<'s>() -> impl Parser<'s, &'s str, Option<String>, Extra<'s>> {
+            just('@').ignore_then(pathname(false)).or_not()
+        }
+
+        pub fn recipe<'s>() -> impl Parser<'s, &'s str, Option<String>, Extra<'s>> {
+            just(':').ignore_then(pathname(true)).or_not()
+        }
+
+        pub fn options<'s>() -> impl Parser<'s, &'s str, HashMap<String, String>, Extra<'s>> {
+            let key = alnum().or(just('_')).repeated().at_least(1).collect();
+            let value = alnum().or(just('_')).repeated().at_least(1).collect();
+            let entry = key.then_ignore(just('=')).then(value);
+            let list = entry.separated_by(just(',')).collect();
+            let default = empty().map(|_| HashMap::new());
+            just(':').ignore_then(list).or(default)
+        }
+
+        pub fn parser<'s>() -> impl Parser<
+            's,
+            &'s str,
+            (
+                String,
+                Option<String>,
+                Option<String>,
+                HashMap<String, String>,
+            ),
+            Extra<'s>,
+        > {
+            group((repo(), branch(), recipe(), options())).then_ignore(end())
+        }
+
         if target.ends_with("-packages.conf") || target.ends_with("-packages.bat") {
             bail!("*-packages.conf and *-packages.bat are not supported")
         }
 
-        let pattern = lazy_regex! {
-            "^"
-            re_capture! { [repo]
-                re_optional! { r"[0-9A-Za-z\-]+\/" }
-                r"[0-9A-Za-z_\-\.]+"
-            }
-            re_optional! {
-                r"\@"
-                re_capture! { [branch] r"[0-9A-Za-z_\-\.\/]+" }
-            }
-            re_optional! {
-                r"\:"
-                re_capture! { [rx_name] r"[0-9A-Za-z_\-\.\/]+" }
-                re_optional! {
-                    r"\:"
-                    re_capture! { [rx_opts]
-                        re_seplist! { [","]
-                            "[0-9A-Za-z]+"
-                            "="
-                            "[0-9A-Za-z]+"
-                        }
-                    }
-                }
-            }
-            "$"
-        };
-
-        let Some(captures) = pattern.captures(target) else {
-            bail!("invalid package or recipe {target}");
-        };
-
-        let mut repo = captures["repo"].to_string();
-        let branch = captures.name("branch").map(|x| x.as_str());
-        let rx_name = captures.name("rx_name").map(|x| x.as_str());
-        let rx_opts = captures.name("rx_opts").map(|x| x.as_str()).unwrap_or("");
-
-        if let Some(branch) = &branch {
-            if branch.starts_with('.') || branch.ends_with('/') {
-                bail!("invalid package or recipe {target}");
-            }
-        }
-
-        if !repo.contains('/') {
-            repo = format!("rime/rime-{repo}");
-        }
+        let (repo, branch, recipe, options) =
+            parser().parse(target.trim()).into_result().map_err(|e| {
+                let first = e[0].to_string();
+                anyhow!("invalid package or recipe: {target}\n{first}")
+            })?;
 
         Ok(Self {
-            repo,
+            repo: repo.to_string(),
             branch: branch.map(|x| x.to_string()),
-            recipe: rx_name.map(|x| x.parse().unwrap()),
-            options: rx_opts
-                .split(',')
-                .filter(|s| !s.is_empty())
-                .map(|s| s.split_once('=').unwrap())
-                .map(|(k, v)| (k.to_string(), v.to_string()))
-                .collect(),
+            recipe: recipe.map(|x| x.parse().unwrap()),
+            options,
         })
     }
 }
