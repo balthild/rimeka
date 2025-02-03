@@ -660,12 +660,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "regex-lite"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53a49587ad06b26609c52e423de037e7f57f20d53535d66e08c695f347df952a"
-
-[[package]]
 name = "regex-syntax"
 version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -685,7 +679,6 @@ dependencies = [
  "owo-colors",
  "path-clean",
  "pathdiff",
- "regex-lite",
  "saphyr",
  "shellexpand",
  "shlex",
