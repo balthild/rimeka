@@ -37,12 +37,21 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
-    env:
-      ZIGBUILD_TARGET: ${{ matrix.glibc && format('{0}.{1}', matrix.target, matrix.glibc) || matrix.target }}
-      OUTPUT_NAME: ${{ format('rimeka{0}', runner.os == 'Windows' && '.exe' || '') }}
-      UPLOAD_NAME: ${{ format('rimeka-{0}{1}', runner.target, runner.os == 'Windows' && '.exe' || '') }}
 
     steps:
+    - name: Environment Variables
+      run: |
+        BINARY_NAME=rimeka
+        BINARY_EXT=${{ runner.os == 'Windows' && '.exe' || '' }}
+
+        ZIGBUILD_TARGET="${{ matrix.glibc && format('{0}.{1}', matrix.target, matrix.glibc) || matrix.target }}"
+        OUTPUT_NAME="$BINARY_NAME$BINARY_EXT"
+        UPLOAD_NAME="$BINARY_NAME-${{ matrix.target }}$BINARY_EXT"
+
+        echo "ZIGBUILD_TARGET=$ZIGBUILD_TARGET" >> "$GITHUB_ENV"
+        echo "OUTPUT_NAME=$OUTPUT_NAME" >> "$GITHUB_ENV"
+        echo "UPLOAD_NAME=$UPLOAD_NAME" >> "$GITHUB_ENV"
+
     - name: Checkout
       uses: actions/checkout@v4
 
@@ -58,18 +67,19 @@ jobs:
       run: cargo install cargo-zigbuild
 
     - name: Build
-      run: cargo zigbuild --target=$ZIGBUILD_TARGET --release
+      run: cargo zigbuild --target="${{ env.ZIGBUILD_TARGET }}" --release
 
     - name: Print Built Files
-      working-directory: ./target/$ZIGBUILD_TARGET/release
-      run: ls -al
+      run: |
+        ls -al ./target
+        ls -al ./target/${{ env.ZIGBUILD_TARGET }}/release
 
     - name: Rename
-      working-directory: ./target/$ZIGBUILD_TARGET/release
-      run: mv ./$OUTPUT_NAME ./$UPLOAD_NAME
+      working-directory: ./target/${{ env.ZIGBUILD_TARGET }}/release
+      run: mv ${{ env.OUTPUT_NAME }} ${{ env.UPLOAD_NAME }}
 
     - name: Release
       uses: softprops/action-gh-release@v2
       if: ${{ startsWith(github.ref, 'refs/tags/') }}
       with:
-        files: ./target/$ZIGBUILD_TARGET/release/$UPLOAD_NAME
+        files: ./target/${{ env.ZIGBUILD_TARGET }}/release/${{ env.UPLOAD_NAME }}
