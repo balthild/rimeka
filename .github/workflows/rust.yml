@@ -1,0 +1,76 @@
+name: Rust
+
+on:
+  push:
+    paths:
+    - 'src/**'
+    - 'Cargo.toml'
+    - 'Cargo.lock'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: x86_64-apple-darwin
+
+          - os: macos-latest
+            target: aarch64-apple-darwin
+
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            glibc: '2.17'
+
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            glibc: '2.17'
+
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    env:
+      ZIGBUILD_TARGET: ${{ matrix.glibc && format('{0}.{1}', matrix.target, matrix.glibc) || matrix.target }}
+      OUTPUT_NAME: ${{ format('rimeka{0}', runner.os == 'Windows' && '.exe' || '') }}
+      UPLOAD_NAME: ${{ format('rimeka-{0}{1}', runner.target, runner.os == 'Windows' && '.exe' || '') }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@nightly
+      with:
+        targets: ${{ matrix.target }}
+
+    - name: Install Zig
+      uses: mlugg/setup-zig@v1
+
+    - name: Install Cargo Zigbuild
+      run: cargo install cargo-zigbuild
+
+    - name: Build
+      run: cargo zigbuild --target=$ZIGBUILD_TARGET --release
+
+    - name: Print Built Files
+      working-directory: ./target/$ZIGBUILD_TARGET/release
+      run: ls -al
+
+    - name: Rename
+      working-directory: ./target/$ZIGBUILD_TARGET/release
+      run: mv ./$OUTPUT_NAME ./$UPLOAD_NAME
+
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      if: ${{ startsWith(github.ref, 'refs/tags/') }}
+      with:
+        files: ./target/$ZIGBUILD_TARGET/release/$UPLOAD_NAME
