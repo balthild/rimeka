@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context};
@@ -174,18 +176,50 @@ where
 
     for entry in WalkDir::new(src) {
         let entry = entry?;
-        let relative = diff_paths(entry.path(), src).expect("walked path shouldn't be relative");
+        let from = entry.path();
 
+        let relative = diff_paths(from, src).expect("walked path shouldn't be relative");
         if !include.matches(&relative) || exclude.matches(&relative) {
+            continue;
+        }
+
+        let to = dest.join(&relative);
+        if is_identical(entry.path(), &to)? {
             continue;
         }
 
         println!("- {} {}", "Copying:".cyan(), relative.display());
 
-        let to = dest.join(&relative);
         std::fs::create_dir_all(to.parent().unwrap())?;
         std::fs::copy(entry.path(), to)?;
     }
 
     Ok(())
+}
+
+fn is_identical(from: &Path, to: &Path) -> Result<bool> {
+    let size1 = std::fs::metadata(from)?.len();
+    let size2 = std::fs::metadata(to).map(|x| x.len());
+    if size2.is_err() || size2.is_ok_and(|x| x != size1) {
+        return Ok(false);
+    }
+
+    let mut buf1 = vec![0; 8192];
+    let mut buf2 = vec![0; 8192];
+    let mut reader1 = BufReader::new(File::open(from)?);
+    let mut reader2 = BufReader::new(File::open(to)?);
+
+    loop {
+        let n1 = reader1.read(&mut buf1)?;
+        let n2 = reader2.read(&mut buf2)?;
+        if n1 == 0 || n2 == 0 {
+            break;
+        }
+
+        if buf1[..n1] != buf2[..n2] {
+            return Ok(false);
+        }
+    }
+
+    Ok(true)
 }
