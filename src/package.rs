@@ -39,7 +39,7 @@ impl<'a> Package<'a> {
     }
 
     pub fn install(&self, dest: PathBuf) -> Result {
-        for (k, v) in self.spec.args() {
+        for (k, v) in self.spec.options() {
             println!("- {} {} = {}", "Option:".cyan(), k, v);
         }
 

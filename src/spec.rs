@@ -40,7 +40,7 @@ impl Spec {
         self.recipe.as_ref()
     }
 
-    pub fn args(&self) -> &HashMap<String, String> {
+    pub fn options(&self) -> &HashMap<String, String> {
         &self.options
     }
 
@@ -49,6 +49,21 @@ impl Spec {
             Some(Recipe::Explicit(name)) => format!("{}:{}", self.repo, name),
             _ => self.repo.to_string(),
         }
+    }
+
+    pub fn patch_id(&self) -> String {
+        if self.recipe.is_none() {
+            return String::new();
+        }
+
+        let options = self
+            .options
+            .iter()
+            .map(|(k, v)| format!("{k}={v}"))
+            .collect::<Vec<_>>()
+            .join(",");
+
+        format!("{}:{}", self.name(), options)
     }
 
     pub fn locate_package(&self, base: &Path) -> Package {

@@ -65,7 +65,7 @@ impl<'a> RecipeInstaller<'a> {
         }
 
         // Overriden options specified in the CLI args
-        self.options.extend(self.package.spec().args().clone());
+        self.options.extend(self.package.spec().options().clone());
     }
 
     fn install_files(&self, patterns: &str) -> Result {
@@ -106,8 +106,8 @@ impl<'a> RecipeInstaller<'a> {
             yaml.push("__patch:".to_string());
         }
 
-        let name = self.package.spec().name();
-        let header = format!("# Rx: {name}: {{");
+        let id = self.package.spec().patch_id();
+        let header = format!("# Rx: {id} {{");
         let footer = "# }".to_string();
 
         if let Some(line_top) = yaml.iter().position(|x| x == &header) {
