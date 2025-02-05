@@ -37,6 +37,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
+    defaults:
+      run:
+        shell: bash
 
     steps:
     - name: Environment Variables
