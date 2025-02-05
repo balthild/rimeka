@@ -52,6 +52,7 @@ jobs:
         targets: ${{ matrix.target }}
 
     - name: Install Zig
+      if: ${{ runner.os != 'Windows' }}
       uses: mlugg/setup-zig@v1
 
     - name: Install Cargo Zigbuild
