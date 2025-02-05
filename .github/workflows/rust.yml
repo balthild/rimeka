@@ -43,7 +43,22 @@ jobs:
         shell: bash
 
     steps:
-    - name: Environment Variables
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@nightly
+      with:
+        targets: ${{ matrix.target }}
+
+    - name: Install Zig
+      uses: mlugg/setup-zig@v1
+
+    - name: Install Cargo Zigbuild
+      if: ${{ runner.os != 'Windows' }}
+      run: cargo install cargo-zigbuild
+
+    - name: Build Configurations
       run: |
         BINARY_NAME=rimeka
         BINARY_EXT=${{ runner.os == 'Windows' && '.exe' || '' }}
@@ -59,21 +74,6 @@ jobs:
         echo "OUTPUT_DIR=$OUTPUT_DIR" >> "$GITHUB_ENV"
         echo "OUTPUT_FILE=$OUTPUT_FILE" >> "$GITHUB_ENV"
         echo "RELEASE_FILE=$RELEASE_FILE" >> "$GITHUB_ENV"
-
-    - name: Checkout
-      uses: actions/checkout@v4
-
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@nightly
-      with:
-        targets: ${{ matrix.target }}
-
-    - name: Install Zig
-      uses: mlugg/setup-zig@v1
-
-    - name: Install Cargo Zigbuild
-      if: ${{ runner.os != 'Windows' }}
-      run: cargo install cargo-zigbuild
 
     - name: Build
       run: cargo "${{ env.BUILD_COMMAND }}" --target="${{ env.BUILD_TARGET }}" --release
