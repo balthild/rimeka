@@ -4,7 +4,15 @@ Rime configuration installer. An alternative to [/plum/](https://github.com/rime
 
 ## Installation
 
-TODO.
+With cargo-binstall:
+
+```shell
+cargo binstall rimeka
+```
+
+Manual installation:
+
+Download the binary from [releases](https://github.com/balthild/rimeka/releases).
 
 ## Usage
 

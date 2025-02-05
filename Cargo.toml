@@ -4,7 +4,7 @@ version = "0.1.1"
 edition = "2021"
 description = "RIME configuration installer"
 license = "MPL-2.0"
-homepage = "https://github.com/balthild/rimeka"
+repository = "https://github.com/balthild/rimeka"
 
 [dependencies]
 anyhow = "1.0.95"
