@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -12,7 +13,7 @@ pub struct Options {
     pub select: bool,
 
     /// Specify the RIME frontend
-    #[bpaf(short, long, fallback(Frontend::Unknown))]
+    #[bpaf(short, long, fallback(Frontend::default()))]
     pub frontend: Frontend,
 
     /// Specify the directory of RIME configurations
@@ -60,12 +61,23 @@ pub enum Frontend {
     Unknown,
 }
 
-impl Frontend {
-    pub fn or_guess(&self) -> Self {
-        let Self::Unknown = self else {
-            return *self;
+impl Display for Frontend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            Frontend::Fcitx => "fcitx/fcitx-rime",
+            Frontend::Fcitx5 => "fcitx/fcitx5-rime",
+            Frontend::Ibus => "rime/ibus-rime",
+            Frontend::Squirrel => "rime/squirrel",
+            Frontend::Weasel => "rime/weasel",
+            Frontend::Unknown => "unknown",
         };
 
+        f.write_str(name)
+    }
+}
+
+impl Default for Frontend {
+    fn default() -> Self {
         #[allow(unreachable_patterns)]
         match true {
             cfg!(target_os = "linux") => Self::Ibus,
@@ -82,7 +94,7 @@ impl FromStr for Frontend {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "fcitx/fcitx-rime" | "fcitx-rime" => Ok(Self::Fcitx),
-            "fcitx5/fcitx5-rime" | "fcitx5-rime" => Ok(Self::Fcitx5),
+            "fcitx/fcitx5-rime" | "fcitx5/fcitx5-rime" | "fcitx5-rime" => Ok(Self::Fcitx5),
             "rime/ibus-rime" | "ibus-rime" => Ok(Self::Ibus),
             "rime/squirrel" | "squirrel" => Ok(Self::Squirrel),
             "rime/weasel" | "weasel" => Ok(Self::Weasel),

@@ -36,7 +36,7 @@ impl GitFetcher {
             .wait()?
             .exit_ok()?;
 
-        Ok(())
+        Ok(println!())
     }
 
     pub fn pull(&self) -> Result {
@@ -46,7 +46,7 @@ impl GitFetcher {
         self.call("git", &["reset", "--hard", &format!("origin/{}", head)])?;
         self.call("git", &["clean", "-xdf"])?;
 
-        Ok(())
+        Ok(println!())
     }
 
     fn call(&self, command: &str, args: &[&str]) -> Result {

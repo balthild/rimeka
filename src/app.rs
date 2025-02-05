@@ -12,17 +12,25 @@ use crate::Result;
 
 pub struct App {
     options: Options,
+    rime_dir: PathBuf,
+    data_dir: PathBuf,
+    packages_dir: PathBuf,
 }
 
 impl App {
     pub fn new(options: Options) -> Self {
-        Self { options }
+        Self {
+            options,
+            rime_dir: PathBuf::new(),
+            data_dir: PathBuf::new(),
+            packages_dir: PathBuf::new(),
+        }
     }
 
-    pub fn run(self) -> Result {
-        self.mkdir()?;
+    pub fn run(mut self) -> Result {
+        self.initialize()?;
 
-        let mut specs = self.resolve_targets()?;
+        let mut specs = self.resolve()?;
 
         if self.options.select {
             specs = self.select(specs);
@@ -34,24 +42,30 @@ impl App {
         self.install(specs)
     }
 
-    fn mkdir(&self) -> Result {
-        let rime = self.rime_dir()?;
-        let data = self.data_dir()?;
-        let packages = self.packages_dir()?;
+    fn initialize(&mut self) -> Result {
+        self.rime_dir = Self::find_rime_dir(&self.options)?;
+        self.data_dir = Self::find_data_dir()?;
+        self.packages_dir = self.data_dir.join("packages");
 
-        println!("RIME User Directory: {}", rime.display());
-        println!("Rimeka Directory: {}", data.display());
-        println!("Packages Directory: {}", packages.display());
+        let frontend = match self.options.dir {
+            Some(_) => Frontend::Unknown,
+            None => self.options.frontend,
+        };
+        println!("Installing for RIME frontend: {}", frontend.magenta());
         println!();
 
-        std::fs::create_dir_all(rime)?;
-        std::fs::create_dir_all(data)?;
-        std::fs::create_dir_all(packages)?;
+        println!("RIME User Directory: {}", self.rime_dir.display());
+        println!("Packages Directory: {}", self.packages_dir.display());
+        println!();
+
+        std::fs::create_dir_all(&self.rime_dir)?;
+        std::fs::create_dir_all(&self.data_dir)?;
+        std::fs::create_dir_all(&self.packages_dir)?;
 
         Ok(())
     }
 
-    fn resolve_targets(&self) -> Result<Vec<Spec>> {
+    fn resolve(&self) -> Result<Vec<Spec>> {
         let resolved = self
             .options
             .targets
@@ -78,47 +92,28 @@ impl App {
     }
 
     fn install(&self, specs: Vec<Spec>) -> Result {
-        let base = self.packages_dir()?;
-
         for spec in &specs {
             println!("{} {}", "Fetching:".green(), spec.repo(),);
-            spec.locate_package(&base).fetch()?;
+            spec.locate_package(&self.packages_dir).fetch()?;
         }
 
         for spec in &specs {
             println!("{} {}", "Installing:".green(), spec.name());
-            spec.locate_package(&base).install(self.rime_dir()?)?;
+            spec.locate_package(&self.packages_dir)
+                .install(self.rime_dir.clone())?;
         }
 
         Ok(())
     }
 
-    fn data_dir(&self) -> Result<PathBuf> {
-        let data = dirs::data_local_dir().context("user profile dir unavailable")?;
-
-        #[allow(unreachable_patterns)]
-        let name = match true {
-            cfg!(target_os = "windows") => "Rimeka",
-            cfg!(target_os = "macos") => "Rimeka",
-            cfg!(unix) => "rimeka",
-            _ => bail!("unsupported operating system"),
-        };
-
-        Ok(data.join(name))
-    }
-
-    fn packages_dir(&self) -> Result<PathBuf> {
-        Ok(self.data_dir()?.join("packages"))
-    }
-
-    fn rime_dir(&self) -> Result<PathBuf> {
-        if let Some(x) = &self.options.dir {
+    fn find_rime_dir(options: &Options) -> Result<PathBuf> {
+        if let Some(x) = &options.dir {
             return Ok(x.clean());
         }
 
         let home = dirs::home_dir().context("user profile dir unavailable")?;
 
-        let dir = match self.options.frontend.or_guess() {
+        let dir = match options.frontend {
             Frontend::Fcitx => ".config/fcitx/rime",
             Frontend::Fcitx5 => ".local/share/fcitx5/rime",
             Frontend::Ibus => ".config/ibus/rime",
@@ -130,5 +125,19 @@ impl App {
         };
 
         Ok(home.join(dir).clean())
+    }
+
+    fn find_data_dir() -> Result<PathBuf> {
+        let data = dirs::data_local_dir().context("user profile dir unavailable")?;
+
+        #[allow(unreachable_patterns)]
+        let name = match true {
+            cfg!(target_os = "windows") => "Rimeka",
+            cfg!(target_os = "macos") => "Rimeka",
+            cfg!(unix) => "rimeka",
+            _ => bail!("unsupported operating system"),
+        };
+
+        Ok(data.join(name))
     }
 }
