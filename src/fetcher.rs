@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 
 use crate::spec::Spec;
-use crate::Result;
 
 pub struct GitFetcher {
     url: String,
@@ -20,90 +19,126 @@ impl GitFetcher {
 }
 
 #[cfg(feature = "git-cli")]
-impl GitFetcher {
-    pub fn clone(&self) -> Result {
-        use std::process::Command;
+mod cli {
+    use std::io::BufRead;
+    use std::process::Command;
 
-        std::fs::create_dir_all(&self.dir)?;
+    use anyhow::Context;
 
-        Command::new("git")
-            .current_dir(&self.dir)
-            .arg("clone")
-            .arg(&self.url)
-            .arg(&self.dir)
-            .arg("--depth=1")
-            .spawn()?
-            .wait()?
-            .exit_ok()?;
+    use crate::Result;
 
-        Ok(println!())
-    }
+    impl super::GitFetcher {
+        pub fn clone(&self) -> Result {
+            std::fs::create_dir_all(&self.dir)?;
 
-    pub fn pull(&self) -> Result {
-        let head = self.branch.as_deref().unwrap_or("HEAD");
-        self.call("git", &["remote", "set-head", "--auto", "origin"])?;
-        self.call("git", &["fetch", "origin", head, "--depth=1"])?;
-        self.call("git", &["reset", "--hard", &format!("origin/{}", head)])?;
-        self.call("git", &["clean", "-xdf"])?;
+            let mut command = Command::new("git");
+            command.current_dir(&self.dir);
+            command.arg("clone");
+            command.arg(&self.url);
+            command.arg(&self.dir);
+            command.arg("--depth=1");
+            if let Some(branch) = &self.branch {
+                command.args(["--branch", branch]);
+            }
 
-        Ok(println!())
-    }
+            command.spawn()?.wait()?.exit_ok()?;
 
-    fn call(&self, command: &str, args: &[&str]) -> Result {
-        use std::process::Command;
+            Ok(println!())
+        }
 
-        Command::new(command)
-            .current_dir(&self.dir)
-            .args(args)
-            .spawn()?
-            .wait()?
-            .exit_ok()?;
+        pub fn pull(&self) -> Result {
+            let branch = match &self.branch {
+                Some(branch) => branch.clone(),
+                None => self.get_default_branch()?,
+            };
+            let upstream = format!("origin/{branch}");
 
-        Ok(())
+            self.call("git", &["clean", "-xdf"])?;
+            self.call("git", &["reset", "--hard", "HEAD"])?;
+            self.call("git", &["fetch", "origin", &branch, "--depth=1"])?;
+            self.call("git", &["switch", "-C", &branch, "--track", &upstream])?;
+
+            Ok(println!())
+        }
+
+        fn get_default_branch(&self) -> Result<String> {
+            let output = Command::new("git")
+                .current_dir(&self.dir)
+                .args(["ls-remote", "--symref", "origin", "HEAD"])
+                .output()?;
+
+            output.status.exit_ok()?;
+
+            output
+                .stdout
+                .lines()
+                .map_while(|x| x.ok())
+                .find(|x| x.starts_with("ref: refs/heads/") && x.ends_with("\tHEAD"))
+                .and_then(|x| {
+                    x["ref: refs/heads/".len()..]
+                        .split_ascii_whitespace()
+                        .map(|x| x.to_string())
+                        .next()
+                })
+                .context("unexpected output from `git ls-remote`")
+        }
+
+        fn call(&self, command: &str, args: &[&str]) -> Result {
+            Command::new(command)
+                .current_dir(&self.dir)
+                .args(args)
+                .spawn()?
+                .wait()?
+                .exit_ok()?;
+
+            Ok(())
+        }
     }
 }
 
 #[cfg(feature = "git-libgit2")]
-impl GitFetcher {
-    pub fn clone(&self) -> Result {
-        use git2::build::RepoBuilder;
-        use git2::FetchOptions;
+mod libgit2 {
+    use git2::build::RepoBuilder;
+    use git2::{Direction, FetchOptions, Repository, ResetType};
 
-        let mut builder = RepoBuilder::new();
+    use crate::Result;
 
-        let mut fetch_opts = FetchOptions::new();
-        fetch_opts.depth(1);
-        builder.fetch_options(fetch_opts);
+    impl super::GitFetcher {
+        pub fn clone(&self) -> Result {
+            let mut builder = RepoBuilder::new();
 
-        if let Some(branch) = &self.branch {
-            builder.branch(branch);
+            let mut fetch_opts = FetchOptions::new();
+            fetch_opts.depth(1);
+            builder.fetch_options(fetch_opts);
+
+            if let Some(branch) = &self.branch {
+                builder.branch(branch);
+            }
+
+            builder.clone(&self.url, &self.dir)?;
+
+            Ok(())
         }
 
-        builder.clone(&self.url, &self.dir)?;
+        pub fn pull(&self) -> Result {
+            let repo = Repository::open(&self.dir)?;
 
-        Ok(())
-    }
+            let mut remote = repo.find_remote("origin")?;
+            remote.connect(Direction::Fetch)?;
 
-    pub fn pull(&self) -> Result {
-        use git2::{Direction, FetchOptions, Repository, ResetType};
+            let branch = match &self.branch {
+                Some(branch) => branch.clone(),
+                None => String::from_utf8(remote.default_branch()?.to_vec())?,
+            };
 
-        let repo = Repository::open(&self.dir)?;
+            remote.fetch(&[branch], Some(FetchOptions::new().depth(1)), None)?;
 
-        let mut remote = repo.find_remote("origin")?;
-        remote.connect(Direction::Fetch)?;
+            let fetch_head = repo.find_reference("FETCH_HEAD")?;
+            let commit = fetch_head.peel_to_commit()?.into_object();
 
-        let branch = match &self.branch {
-            Some(branch) => branch.clone(),
-            None => String::from_utf8(remote.default_branch()?.to_vec())?,
-        };
+            repo.reset(&commit, ResetType::Hard, None)?;
 
-        remote.fetch(&[branch], Some(FetchOptions::new().depth(1)), None)?;
-
-        let fetch_head = repo.find_reference("FETCH_HEAD")?;
-        let commit = fetch_head.peel_to_commit()?.into_object();
-
-        repo.reset(&commit, ResetType::Hard, None)?;
-
-        Ok(())
+            Ok(())
+        }
     }
 }
