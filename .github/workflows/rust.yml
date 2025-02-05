@@ -2,9 +2,10 @@ name: Rust
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ['main']
+    tags: ['*']
   pull_request:
-    branches: [ "main" ]
+    branches: ['main']
 
 env:
   CARGO_TERM_COLOR: always
@@ -47,12 +48,14 @@ jobs:
         BINARY_NAME=rimeka
         BINARY_EXT=${{ runner.os == 'Windows' && '.exe' || '' }}
 
-        ZIGBUILD_TARGET="${{ matrix.glibc && format('{0}.{1}', matrix.target, matrix.glibc) || matrix.target }}"
+        BUILD_COMMAND="${{ matrix.glibc && 'zigbuild' || 'build' }}"
+        BUILD_TARGET="${{ matrix.glibc && format('{0}.{1}', matrix.target, matrix.glibc) || matrix.target }}"
         OUTPUT_DIR="./target/${{ matrix.target }}/release"
         OUTPUT_FILE="$BINARY_NAME$BINARY_EXT"
         RELEASE_FILE="$BINARY_NAME-${{ matrix.target }}$BINARY_EXT"
 
-        echo "ZIGBUILD_TARGET=$ZIGBUILD_TARGET" >> "$GITHUB_ENV"
+        echo "BUILD_COMMAND=$BUILD_COMMAND" >> "$GITHUB_ENV"
+        echo "BUILD_TARGET=$BUILD_TARGET" >> "$GITHUB_ENV"
         echo "OUTPUT_DIR=$OUTPUT_DIR" >> "$GITHUB_ENV"
         echo "OUTPUT_FILE=$OUTPUT_FILE" >> "$GITHUB_ENV"
         echo "RELEASE_FILE=$RELEASE_FILE" >> "$GITHUB_ENV"
@@ -69,10 +72,11 @@ jobs:
       uses: mlugg/setup-zig@v1
 
     - name: Install Cargo Zigbuild
+      if: ${{ runner.os != 'Windows' }}
       run: cargo install cargo-zigbuild
 
     - name: Build
-      run: cargo zigbuild --target="${{ env.ZIGBUILD_TARGET }}" --release
+      run: cargo "${{ env.BUILD_COMMAND }}" --target="${{ env.BUILD_TARGET }}" --release
 
     - name: Rename
       working-directory: ${{ env.OUTPUT_DIR }}
