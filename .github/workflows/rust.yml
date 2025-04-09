@@ -43,48 +43,48 @@ jobs:
         shell: bash
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@nightly
-      with:
-        targets: ${{ matrix.target }}
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: ${{ matrix.target }}
 
-    - name: Install Zig
-      if: ${{ runner.os != 'Windows' }}
-      uses: mlugg/setup-zig@v1
+      - name: Install Zig
+        if: ${{ runner.os != 'Windows' }}
+        uses: mlugg/setup-zig@v1
 
-    - name: Install Cargo Zigbuild
-      if: ${{ runner.os != 'Windows' }}
-      run: cargo install cargo-zigbuild
+      - name: Install Cargo Zigbuild
+        if: ${{ runner.os != 'Windows' }}
+        run: cargo install cargo-zigbuild
 
-    - name: Build Configurations
-      run: |
-        BINARY_NAME=rimeka
-        BINARY_EXT=${{ runner.os == 'Windows' && '.exe' || '' }}
+      - name: Build Configurations
+        run: |
+          BINARY_NAME="rimeka"
+          BINARY_EXT="${{ runner.os == 'Windows' && '.exe' || '' }}"
 
-        BUILD_COMMAND="${{ matrix.glibc && 'zigbuild' || 'build' }}"
-        BUILD_TARGET="${{ matrix.glibc && format('{0}.{1}', matrix.target, matrix.glibc) || matrix.target }}"
-        OUTPUT_DIR="./target/${{ matrix.target }}/release"
-        OUTPUT_FILE="$BINARY_NAME$BINARY_EXT"
-        RELEASE_FILE="$BINARY_NAME-${{ matrix.target }}$BINARY_EXT"
+          BUILD_COMMAND="${{ matrix.glibc && 'zigbuild' || 'build' }}"
+          BUILD_TARGET="${{ matrix.glibc && format('{0}.{1}', matrix.target, matrix.glibc) || matrix.target }}"
+          OUTPUT_DIR="./target/${{ matrix.target }}/release"
+          OUTPUT_FILE="$BINARY_NAME$BINARY_EXT"
+          RELEASE_FILE="$BINARY_NAME-${{ matrix.target }}$BINARY_EXT"
 
-        echo "BUILD_COMMAND=$BUILD_COMMAND" >> "$GITHUB_ENV"
-        echo "BUILD_TARGET=$BUILD_TARGET" >> "$GITHUB_ENV"
-        echo "OUTPUT_DIR=$OUTPUT_DIR" >> "$GITHUB_ENV"
-        echo "OUTPUT_FILE=$OUTPUT_FILE" >> "$GITHUB_ENV"
-        echo "RELEASE_FILE=$RELEASE_FILE" >> "$GITHUB_ENV"
+          echo "BUILD_COMMAND=$BUILD_COMMAND" >> "$GITHUB_ENV"
+          echo "BUILD_TARGET=$BUILD_TARGET" >> "$GITHUB_ENV"
+          echo "OUTPUT_DIR=$OUTPUT_DIR" >> "$GITHUB_ENV"
+          echo "OUTPUT_FILE=$OUTPUT_FILE" >> "$GITHUB_ENV"
+          echo "RELEASE_FILE=$RELEASE_FILE" >> "$GITHUB_ENV"
 
-    - name: Build
-      run: cargo "${{ env.BUILD_COMMAND }}" --target="${{ env.BUILD_TARGET }}" --release
+      - name: Build
+        run: cargo "${{ env.BUILD_COMMAND }}" --target="${{ env.BUILD_TARGET }}" --release
 
-    - name: Rename
-      working-directory: ${{ env.OUTPUT_DIR }}
-      run: mv ${{ env.OUTPUT_FILE }} ${{ env.RELEASE_FILE }}
+      - name: Rename
+        working-directory: ${{ env.OUTPUT_DIR }}
+        run: mv ${{ env.OUTPUT_FILE }} ${{ env.RELEASE_FILE }}
 
-    - name: Release
-      uses: softprops/action-gh-release@v2
-      if: ${{ startsWith(github.ref, 'refs/tags/') }}
-      with:
-        files: ${{ env.OUTPUT_DIR }}/${{ env.RELEASE_FILE }}
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        with:
+          files: ${{ env.OUTPUT_DIR }}/${{ env.RELEASE_FILE }}

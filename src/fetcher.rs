@@ -43,7 +43,8 @@ mod cli {
 
             command.spawn()?.wait()?.exit_ok()?;
 
-            Ok(println!())
+            println!();
+            Ok(())
         }
 
         pub fn pull(&self) -> Result {
@@ -58,7 +59,8 @@ mod cli {
             self.call("git", &["fetch", "origin", &branch, "--depth=1"])?;
             self.call("git", &["switch", "-C", &branch, "--track", &upstream])?;
 
-            Ok(println!())
+            println!();
+            Ok(())
         }
 
         fn get_default_branch(&self) -> Result<String> {
@@ -72,13 +74,12 @@ mod cli {
             output
                 .stdout
                 .lines()
-                .map_while(|x| x.ok())
-                .find(|x| x.starts_with("ref: refs/heads/") && x.ends_with("\tHEAD"))
-                .and_then(|x| {
-                    x["ref: refs/heads/".len()..]
-                        .split_ascii_whitespace()
-                        .map(|x| x.to_string())
-                        .next()
+                .map_while(|line| line.ok())
+                .find_map(|line| {
+                    line.strip_prefix("ref: refs/heads/")
+                        .and_then(|x| x.strip_suffix("\tHEAD"))
+                        .map(str::trim)
+                        .map(String::from)
                 })
                 .context("unexpected output from `git ls-remote`")
         }

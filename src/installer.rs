@@ -127,9 +127,9 @@ impl<'a> RecipeInstaller<'a> {
 
         yaml.push(header);
         yaml.extend(out.lines().skip(1).map(|line| {
-            let line = format!("  {line}");
-            let line = shellexpand::env_with_context_no_errors(&line, |key| self.options.get(key));
-            line.to_string()
+            use shellexpand::env_with_context_no_errors as expand;
+            let line = expand(line, |key| self.options.get(key));
+            format!("  {line}")
         }));
         yaml.push(footer);
 

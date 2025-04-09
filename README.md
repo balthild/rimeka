@@ -30,12 +30,10 @@ Available options:
     -V, --version       Prints version information
 ```
 
-<details>
-<summary>Example</summary>
+#### Example
 
 Install [雾凇拼音](https://github.com/iDvel/rime-ice) for fcitx5-rime:
 
 ```shell
 rimeka -f fcitx5-rime iDvel/rime-ice:others/recipes/full
 ```
-</details>
