@@ -1,10 +1,14 @@
+use std::ffi::OsStr;
 use std::path::PathBuf;
 
 use anyhow::{bail, Context};
+use chumsky::container::Seq;
 use dialoguer::theme::SimpleTheme;
 use dialoguer::MultiSelect;
 use owo_colors::OwoColorize;
 use path_clean::PathClean;
+use pathdiff::diff_paths;
+use walkdir::WalkDir;
 
 use crate::options::{Frontend, Options};
 use crate::spec::Spec;
@@ -30,6 +34,12 @@ impl App {
     pub fn run(mut self) -> Result {
         self.initialize()?;
 
+        if self.options.list {
+            return self.list();
+        }
+
+        self.banner();
+
         let mut specs = self.resolve()?;
 
         if self.options.select {
@@ -47,22 +57,63 @@ impl App {
         self.data_dir = Self::find_data_dir()?;
         self.packages_dir = self.data_dir.join("packages");
 
+        std::fs::create_dir_all(&self.rime_dir)?;
+        std::fs::create_dir_all(&self.data_dir)?;
+        std::fs::create_dir_all(&self.packages_dir)?;
+
+        Ok(())
+    }
+
+    fn list(&self) -> Result {
+        for entry in WalkDir::new(&self.packages_dir)
+            .min_depth(2)
+            .max_depth(2)
+            .into_iter()
+            .filter_map(|x| x.ok())
+            .filter(|x| x.file_type().is_dir())
+        {
+            let repo_path = entry.path();
+            let repo = diff_paths(repo_path, &self.packages_dir)
+                .context("walked path shouldn't be relative")?
+                .to_string_lossy()
+                .into_owned();
+
+            let repo = repo.strip_prefix("rime/rime-").unwrap_or(&repo);
+            println!("{repo}");
+
+            for entry in WalkDir::new(repo_path)
+                .into_iter()
+                .filter_entry(|x| x.file_name() != OsStr::new(".git"))
+                .filter_map(|x| x.ok())
+                .filter(|x| x.file_type().is_file())
+            {
+                let recipe_path = entry.path();
+                let recipe = diff_paths(recipe_path, repo_path)
+                    .context("walked path shouldn't be relative")?
+                    .to_string_lossy()
+                    .into_owned();
+
+                if let Some(recipe) = recipe.strip_suffix(".recipe.yaml") {
+                    println!("{repo}:{recipe}");
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn banner(&self) {
         let frontend = match self.options.dir {
             Some(_) => Frontend::Unknown,
             None => self.options.frontend,
         };
+
         println!("Installing for RIME frontend: {}", frontend.magenta());
         println!();
 
         println!("RIME User Directory: {}", self.rime_dir.display());
         println!("Packages Directory: {}", self.packages_dir.display());
         println!();
-
-        std::fs::create_dir_all(&self.rime_dir)?;
-        std::fs::create_dir_all(&self.data_dir)?;
-        std::fs::create_dir_all(&self.packages_dir)?;
-
-        Ok(())
     }
 
     fn resolve(&self) -> Result<Vec<Spec>> {

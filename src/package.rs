@@ -4,7 +4,7 @@ use anyhow::Context;
 use owo_colors::OwoColorize;
 use path_clean::PathClean;
 
-use crate::fetcher::GitFetcher;
+use crate::fetcher::GitHubFetcher;
 use crate::installer::{DefaultInstaller, RecipeInstaller};
 use crate::spec::{Recipe, Spec};
 use crate::Result;
@@ -30,7 +30,7 @@ impl<'a> Package<'a> {
     }
 
     pub fn fetch(&self) -> Result {
-        let fetcher = GitFetcher::new(self.spec, &self.dir);
+        let fetcher = GitHubFetcher::new(self.spec, &self.dir);
         if self.dir.join(".git").is_dir() {
             fetcher.pull()
         } else {

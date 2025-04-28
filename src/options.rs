@@ -8,6 +8,10 @@ use bpaf::{Args, Bpaf, ParseFailure};
 #[derive(Debug, Bpaf)]
 #[bpaf(options, version, fallback_to_usage)]
 pub struct Options {
+    /// List known packages
+    #[bpaf(short, long)]
+    pub list: bool,
+
     /// Select package interactively
     #[bpaf(short, long)]
     pub select: bool,

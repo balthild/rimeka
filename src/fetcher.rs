@@ -7,13 +7,13 @@ use anyhow::Context;
 use crate::spec::Spec;
 use crate::Result;
 
-pub struct GitFetcher {
+pub struct GitHubFetcher {
     url: String,
     dir: PathBuf,
     branch: Option<String>,
 }
 
-impl GitFetcher {
+impl GitHubFetcher {
     pub fn new(spec: &Spec, dir: &Path) -> Self {
         Self {
             url: format!("https://github.com/{}", spec.repo()),
