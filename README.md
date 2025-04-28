@@ -17,12 +17,13 @@ Download the binary from [releases](https://github.com/balthild/rimeka/releases)
 ## Usage
 
 ```
-Usage: rimeka.exe [-s] [-f=ARG] [-d=ARG] [<targets>]...
+Usage: rimeka [-l] [-s] [-f=ARG] [-d=ARG] [<targets>]...
 
 Available positional items:
     <targets>           Specify packages or recipes to be installed
 
 Available options:
+    -l, --list          List known packages
     -s, --select        Select package interactively
     -f, --frontend=ARG  Specify the RIME frontend
     -d, --dir=ARG       Specify the directory of RIME configurations
