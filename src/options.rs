@@ -78,12 +78,11 @@ impl Display for Frontend {
 
 impl Default for Frontend {
     fn default() -> Self {
-        #[allow(unreachable_patterns)]
-        match true {
-            cfg!(target_os = "linux") => Self::Ibus,
-            cfg!(target_os = "macos") => Self::Squirrel,
-            cfg!(target_os = "windows") => Self::Weasel,
-            _ => Self::Unknown,
+        cfg_match! {
+            target_os = "linux" => { Self::Ibus }
+            target_os = "macos" => { Self::Squirrel }
+            target_os = "windows" => { Self::Weasel }
+            _ => { Self::Unknown }
         }
     }
 }
