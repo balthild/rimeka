@@ -12,7 +12,6 @@ bpaf = { version = "0.9.16", features = ["derive", "dull-color"] }
 chumsky = "0.10.0"
 dialoguer = "0.11.0"
 dirs = "6.0.0"
-git2 = { version = "0.20.0", optional = true }
 glob = "0.3.2"
 owo-colors = "4.1.0"
 path-clean = "1.0.1"
@@ -21,11 +20,6 @@ saphyr = "0.0.3"
 shellexpand = "3.1.0"
 shlex = "1.3.0"
 walkdir = "2.5.0"
-
-[features]
-default = ["git-cli"]
-git-cli = []
-git-libgit2 = ["dep:git2"]
 
 [profile.release]
 lto = true
