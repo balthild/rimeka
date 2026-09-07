@@ -80,13 +80,14 @@ impl Display for Frontend {
     }
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for Frontend {
     fn default() -> Self {
-        cfg_match! {
-            target_os = "linux" => { Self::Ibus }
-            target_os = "macos" => { Self::Squirrel }
-            target_os = "windows" => { Self::Weasel }
-            _ => { Self::Unknown }
+        cfg_select! {
+            target_os = "linux" => Self::Ibus,
+            target_os = "macos" => Self::Squirrel,
+            target_os = "windows" => Self::Weasel,
+            _ => Self::Unknown,
         }
     }
 }

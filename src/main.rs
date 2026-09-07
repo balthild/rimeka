@@ -1,6 +1,5 @@
 #![feature(iterator_try_collect)]
 #![feature(exit_status_error)]
-#![feature(cfg_match)]
 
 use owo_colors::OwoColorize;
 

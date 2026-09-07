@@ -66,7 +66,7 @@ impl Spec {
         format!("{}:{}", self.name(), options)
     }
 
-    pub fn locate_package(&self, base: &Path) -> Package {
+    pub fn locate_package<'a>(&'a self, base: &Path) -> Package<'a> {
         Package::new(self, base)
     }
 }
